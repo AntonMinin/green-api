@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { applyNotification, newChat, toPhone } from './chat.js'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const readJson = async (res) => {
+  const text = await res.text()
+  return text ? JSON.parse(text) : null
+}
 const formatTime = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
 function apiUrl({ host, idInstance, apiTokenInstance }, method) {
@@ -111,7 +115,9 @@ function ChatWindow({ chat, onSend, onBack }) {
   const [error, setError] = useState('')
   const bottom = useRef(null)
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [chat.messages.length])
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chat.messages.length])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -175,7 +181,7 @@ export default function App() {
         try {
           const res = await fetch(`${apiUrl(creds, 'receiveNotification')}?receiveTimeout=20`, { signal })
           if (!res.ok) throw new Error(`Ошибка получения сообщений: ${res.status}`)
-          const data = await res.json()
+          const data = await readJson(res)
           setPollError('')
           if (!data) continue
           setChats((current) => applyNotification(current, data.body))
@@ -207,7 +213,7 @@ export default function App() {
       body: JSON.stringify({ chatId: chat.chatId, message }),
     })
     if (!res.ok) throw new Error(`Не удалось отправить: ${res.status}`)
-    const { idMessage } = await res.json()
+    const { idMessage = String(Date.now()) } = (await readJson(res)) ?? {}
     const sent = { id: idMessage, text: message, out: true, time: Date.now() }
     setChats((current) =>
       current.map((c) => (c.chatId === chat.chatId ? { ...c, messages: [...c.messages, sent] } : c)),
